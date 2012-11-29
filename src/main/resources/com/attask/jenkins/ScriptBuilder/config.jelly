@@ -1,0 +1,29 @@
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout"
+		 xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+	<f:entry title="Script Name" field="scriptName">
+		<f:select />
+	</f:entry>
+	<f:entry title="Parameters">
+		<f:repeatableProperty field="parameters"/>
+	</f:entry>
+
+	<f:entry title="Abort On Failure" field="abortOnFailure">
+		<f:checkbox />
+	</f:entry>
+	<f:entry title="Fail On" field="errorMode">
+		<f:select />
+	</f:entry>
+	<f:entry title="Fail Value" field="errorRange">
+		<f:textbox />
+	</f:entry>
+
+	<f:entry title="Abort On Unstable" field="abortOnUnstable">
+		<f:checkbox />
+	</f:entry>
+	<f:entry title="Unstable On" field="unstableMode">
+		<f:select />
+	</f:entry>
+	<f:entry title="Unstable Value" field="unstableRange">
+		<f:textbox />
+	</f:entry>
+</j:jelly>

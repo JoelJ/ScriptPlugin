@@ -1,0 +1,11 @@
+<div>
+	<p>(All whitespace is ignored.)</p>
+	<p>When <em>Less Than</em>, <em>Greater Than</em>, or <em>Exactly</em> are set, this should be a single integer value.</p>
+	<p>When <em>Non-Zero</em> this value is completely ignored.</p>
+	<p>
+		When <em>Custom</em> is set, then you can specify ranges and multiple values.<br/>
+		A range looks like: <code>10 &gt; 20</code> This includes both the upper and lower bounds. So in this case, <code>10</code>, <code>20</code>, or any value in between would trigger the build to fail or become unstable.<br/>
+		Multiple values can be separated with a ",". For example: <code>-10,20</code> will fail or become unstable if the exit code is either <code>-10</code> or <code>20</code> and will pass with any other value.<br/>
+		Complex values can be used. For example: <code>-10,10, 20 > 400, 500 > 1000</code>
+	</p>
+</div>
