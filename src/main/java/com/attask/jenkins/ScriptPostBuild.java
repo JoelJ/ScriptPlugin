@@ -37,6 +37,7 @@ public class ScriptPostBuild extends Recorder {
 
 	@Override
 	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
+		listener.getLogger().println("Executing post-build scripts");
 		boolean result = true;
 		for (ScriptBuilder script : scripts) {
 			result = result && script.perform(build, launcher, listener);
