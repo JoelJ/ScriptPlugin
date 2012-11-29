@@ -9,12 +9,16 @@ import hudson.model.Result;
  */
 public class ExitCodeParser {
 	public static Result findResult(int exitCode, ErrorMode errorMode, String errorRange, ErrorMode unstableMode, String unstableRange) {
-		if(exitCodeMatches(exitCode, errorMode, errorRange)) {
-			return Result.FAILURE;
+		if(errorMode != ErrorMode.NONE) {
+			if(exitCodeMatches(exitCode, errorMode, errorRange)) {
+				return Result.FAILURE;
+			}
 		}
 
-		if(exitCodeMatches(exitCode, unstableMode, unstableRange)) {
-			return Result.UNSTABLE;
+		if(unstableMode != ErrorMode.NONE) {
+			if(exitCodeMatches(exitCode, unstableMode, unstableRange)) {
+				return Result.UNSTABLE;
+			}
 		}
 
 		return Result.SUCCESS;

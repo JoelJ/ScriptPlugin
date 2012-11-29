@@ -1,0 +1,7 @@
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout"
+		 xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+	<j:set var="doDeleteButton" value="${true}"/>
+	<f:entry title="Scripts">
+		<f:repeatableProperty field="scripts" minimum="1" title="Script" header="Script Configuration" add="Add another script"/>
+	</f:entry>
+</j:jelly>

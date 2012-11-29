@@ -7,23 +7,31 @@
 		<f:repeatableProperty field="parameters"/>
 	</f:entry>
 
-	<f:entry title="Abort On Failure" field="abortOnFailure">
-		<f:checkbox />
-	</f:entry>
-	<f:entry title="Fail On" field="errorMode">
-		<f:select />
-	</f:entry>
-	<f:entry title="Fail Value" field="errorRange">
-		<f:textbox />
-	</f:entry>
+	<f:advanced>
+		<f:entry title="Abort On Failure" field="abortOnFailure">
+			<f:checkbox />
+		</f:entry>
+		<f:entry title="Fail On" field="errorMode">
+			<f:select />
+		</f:entry>
+		<f:entry title="Fail Value" field="errorRange">
+			<f:textbox />
+		</f:entry>
 
-	<f:entry title="Abort On Unstable" field="abortOnUnstable">
-		<f:checkbox />
-	</f:entry>
-	<f:entry title="Unstable On" field="unstableMode">
-		<f:select />
-	</f:entry>
-	<f:entry title="Unstable Value" field="unstableRange">
-		<f:textbox />
+		<f:entry title="Unstable On" field="unstableMode">
+			<f:select />
+		</f:entry>
+		<f:entry title="Unstable Value" field="unstableRange">
+			<f:textbox />
+		</f:entry>
+	</f:advanced>
+
+	<!--Used in the pre/post build steps.-->
+	<f:entry>
+		<j:if test="${doDeleteButton}">
+			<div class="scriptDeleteButton">
+				<f:repeatableDeleteButton value="Remove this Script"/>
+			</div>
+		</j:if>
 	</f:entry>
 </j:jelly>

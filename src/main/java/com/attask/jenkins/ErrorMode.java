@@ -6,6 +6,7 @@ package com.attask.jenkins;
  * Time: 10:31 AM
  */
 public enum ErrorMode {
+	NONE("None"),
 	LESS_THAN("Less Than"),
 	GREATER_THAN("Greater Than"),
 	EXACTLY("Exactly"),
