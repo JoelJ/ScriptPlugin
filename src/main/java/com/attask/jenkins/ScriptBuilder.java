@@ -14,6 +14,7 @@ import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.export.ExportedBean;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
@@ -31,9 +32,10 @@ public class ScriptBuilder extends Builder {
 	private final String errorRange;
 	private final ErrorMode unstableMode;
 	private final String unstableRange;
+	private final String injectProperties;
 
 	@DataBoundConstructor
-	public ScriptBuilder(String scriptName, List<Parameter> parameters, boolean abortOnFailure, ErrorMode errorMode, String errorRange, ErrorMode unstableMode, String unstableRange) {
+	public ScriptBuilder(String scriptName, List<Parameter> parameters, boolean abortOnFailure, ErrorMode errorMode, String errorRange, ErrorMode unstableMode, String unstableRange, String injectProperties) {
 		this.scriptName = scriptName;
 		if(parameters == null) {
 			this.parameters = Collections.emptyList();
@@ -46,6 +48,8 @@ public class ScriptBuilder extends Builder {
 		this.errorRange = errorRange;
 		this.unstableMode = unstableMode;
 		this.unstableRange = unstableRange;
+
+		this.injectProperties = injectProperties;
 	}
 
 	public String getScriptName() {
@@ -81,6 +85,11 @@ public class ScriptBuilder extends Builder {
 		return unstableRange;
 	}
 
+	@Exported
+	public String getInjectProperties() {
+		return injectProperties;
+	}
+
 	@Override
 	public DescriptorImpl getDescriptor() {
 		return (DescriptorImpl) super.getDescriptor();
@@ -106,6 +115,10 @@ public class ScriptBuilder extends Builder {
 
 			if(result.isWorseThan(Result.SUCCESS)) {
 				listener.error("Exit code " + exitCode + " evaluated to " + result);
+			}
+
+			if(injectProperties != null && !injectProperties.isEmpty()) {
+				build.addAction(new InjectPropertiesAction(new File(injectProperties)));
 			}
 
 			return !(abortOnFailure && result.isWorseOrEqualTo(Result.FAILURE));

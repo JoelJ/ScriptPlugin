@@ -8,6 +8,10 @@
 	</f:entry>
 
 	<f:advanced>
+		<f:entry title="Inject from" field="injectProperties">
+			<f:textbox />
+		</f:entry>
+
 		<f:entry title="Abort On Failure" field="abortOnFailure">
 			<f:checkbox />
 		</f:entry>
