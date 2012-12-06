@@ -109,7 +109,7 @@ public class ScriptBuilder extends Builder {
 		String scriptName = getScriptName();
 		if(runnableScripts.containsKey(scriptName)) {
 			Script script = runnableScripts.get(scriptName);
-			int exitCode = script.execute(Parameter.toStringList(getParameters(), build.getEnvironment(listener)), listener);
+			int exitCode = script.execute(Parameter.toStringList(getParameters(), build.getEnvironment(listener)), build, listener);
 			Result result = ExitCodeParser.findResult(exitCode, errorMode, errorRange, unstableMode, unstableRange);
 			build.setResult(result);
 
@@ -118,7 +118,8 @@ public class ScriptBuilder extends Builder {
 			}
 
 			if(injectProperties != null && !injectProperties.isEmpty()) {
-				build.addAction(new InjectPropertiesAction(new File(injectProperties)));
+				File workspacePath = new File(build.getExecutor().getCurrentWorkspace().getRemote());
+				build.addAction(new InjectPropertiesAction(new File(workspacePath, injectProperties)));
 			}
 
 			return !(abortOnFailure && result.isWorseOrEqualTo(Result.FAILURE));
