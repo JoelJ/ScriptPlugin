@@ -6,6 +6,7 @@ import hudson.model.AbstractDescribableImpl;
 import hudson.model.Descriptor;
 import org.kohsuke.stapler.DataBoundConstructor;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -18,7 +19,7 @@ import java.util.List;
  * Date: 11/28/12
  * Time: 4:00 PM
  */
-public class Parameter extends AbstractDescribableImpl<Parameter> {
+public class Parameter extends AbstractDescribableImpl<Parameter> implements Serializable {
 	private String parameter;
 
 	@DataBoundConstructor

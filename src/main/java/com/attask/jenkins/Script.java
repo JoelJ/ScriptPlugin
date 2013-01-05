@@ -54,14 +54,14 @@ public class Script implements Serializable {
 	 * @throws IOException Thrown if there's an exception raised when attempting to execute the script.
 	 * @throws InterruptedException Thrown when the file is being copied <em>or</em> when the script is being executed if an interruption is caused (such as a build being canceled).
 	 */
-	public int execute(List<String> parameters, Run run, BuildListener listener) throws IOException, InterruptedException {
+	public int execute(List<String> parameters, String workspacePath, BuildListener listener) throws IOException, InterruptedException {
 		File localFile = copyFile(listener);
 		try {
 			List<String> cmdBuilder = new ArrayList<String>(parameters.size() + 1);
 			cmdBuilder.add(localFile.getAbsolutePath());
 			cmdBuilder.addAll(parameters);
 			String[] cmd = cmdBuilder.toArray(new String[cmdBuilder.size()]);
-			File workspaceDirectory = new File(run.getExecutor().getCurrentWorkspace().getRemote());
+			File workspaceDirectory = new File(workspacePath);
 			Process exec = Runtime.getRuntime().exec(cmd, new String[]{}, workspaceDirectory);
 			int errorCode = exec.waitFor();
 

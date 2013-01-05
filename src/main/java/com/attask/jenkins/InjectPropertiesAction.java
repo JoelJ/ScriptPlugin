@@ -22,16 +22,8 @@ import java.util.Properties;
 public class InjectPropertiesAction implements EnvironmentContributingAction {
 	private final Map<String, String> injectedVariables;
 
-	public InjectPropertiesAction(File file) throws IOException {
-		FileInputStream fileStream = new FileInputStream(file);
-		Properties properties = new Properties();
-		properties.load(fileStream);
-
-		Map<String, String> result = new HashMap<String, String>();
-		for (Map.Entry<Object, Object> entry : properties.entrySet()) {
-			result.put((String)entry.getKey(), (String)entry.getValue());
-		}
-		this.injectedVariables = result;
+	public InjectPropertiesAction(Map<String, String> injectedVariables) throws IOException {
+		this.injectedVariables = injectedVariables;
 	}
 
 	@Exported

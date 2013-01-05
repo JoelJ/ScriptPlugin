@@ -1,5 +1,6 @@
 package com.attask.jenkins;
 
+import hudson.EnvVars;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
@@ -14,7 +15,6 @@ import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.export.ExportedBean;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
@@ -104,22 +104,26 @@ public class ScriptBuilder extends Builder {
 	}
 
 	@Override
-	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws InterruptedException, IOException {
-		Map<String, Script> runnableScripts = findRunnableScripts();
-		String scriptName = getScriptName();
+	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener) throws InterruptedException, IOException {
+		final Map<String, Script> runnableScripts = findRunnableScripts();
+		final String scriptName = getScriptName();
 		if(runnableScripts.containsKey(scriptName)) {
-			Script script = runnableScripts.get(scriptName);
-			int exitCode = script.execute(Parameter.toStringList(getParameters(), build.getEnvironment(listener)), build, listener);
+			EnvVars environment = build.getEnvironment(listener);
+			String workspacePath = build.getExecutor().getCurrentWorkspace().getRemote();
+
+			ExecuteScriptCallable fileScriptCallable = new ExecuteScriptCallable(runnableScripts, scriptName, getParameters(), environment, workspacePath, listener);
+			final int exitCode = build.getBuiltOn().getRootPath().act(fileScriptCallable);
+
 			Result result = ExitCodeParser.findResult(exitCode, errorMode, errorRange, unstableMode, unstableRange);
 			build.setResult(result);
-
 			if(result.isWorseThan(Result.SUCCESS)) {
 				listener.error("Exit code " + exitCode + " evaluated to " + result);
 			}
 
 			if(injectProperties != null && !injectProperties.isEmpty()) {
-				File workspacePath = new File(build.getExecutor().getCurrentWorkspace().getRemote());
-				build.addAction(new InjectPropertiesAction(new File(workspacePath, injectProperties)));
+				InjectPropertiesCallable injectPropertiesCallable = new InjectPropertiesCallable(workspacePath, this.injectProperties);
+				Map<String, String> injectedPropertiesMap = build.getExecutor().getCurrentWorkspace().act(injectPropertiesCallable);
+				build.addAction(new InjectPropertiesAction(injectedPropertiesMap));
 			}
 
 			return !(abortOnFailure && result.isWorseOrEqualTo(Result.FAILURE));
