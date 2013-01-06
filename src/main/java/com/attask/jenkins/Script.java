@@ -12,7 +12,7 @@ import java.util.Map;
 
 /**
  * Represents a file hosted on another machine to be executed on the current node.
- *
+ * <p/>
  * User: Joel Johnson
  * Date: 8/29/12
  * Time: 5:38 PM
@@ -23,8 +23,9 @@ public class Script implements Serializable {
 
 	/**
 	 * Creates a new script
+	 *
 	 * @param remoteRootPath The root path on the remote machine where the file exists. Typically this is <code>node.getRootPath()</code> or <code>Jenkins.getInstance().getRootPath()</code>.
-	 * @param file The file on the remote machine. Should be an absolute path or relative to the base path of the first argument.
+	 * @param file           The file on the remote machine. Should be an absolute path or relative to the base path of the first argument.
 	 */
 	public Script(FilePath remoteRootPath, File file) {
 		this.remoteRootPath = remoteRootPath;
@@ -49,9 +50,9 @@ public class Script implements Serializable {
 	 * Copies the script to the current machine, marks it as executable, and executes it.
 	 *
 	 * @param parameters The arguments to be passed into the script when executed. Each entry in the list will be treated as only one argument, whether or not it has whitespace in it.
-	 * @param listener The listener for the build. Used for logging.
+	 * @param listener   The listener for the build. Used for logging.
 	 * @return The exit code of the script.
-	 * @throws IOException Thrown if there's an exception raised when attempting to execute the script.
+	 * @throws IOException          Thrown if there's an exception raised when attempting to execute the script.
 	 * @throws InterruptedException Thrown when the file is being copied <em>or</em> when the script is being executed if an interruption is caused (such as a build being canceled).
 	 */
 	public int execute(List<String> parameters, Map<String, String> environment, String workspacePath, BuildListener listener) throws IOException, InterruptedException {
@@ -83,7 +84,8 @@ public class Script implements Serializable {
 			Process exec = processBuilder.start();
 
 			logger.println("Output: ");
-			StreamUtils.copy(exec.getInputStream(), logger, 512);
+			InputStream input = exec.getInputStream();
+			dumpInputStreamToLogger(logger, input);
 
 			int errorCode = exec.waitFor();
 
@@ -100,8 +102,19 @@ public class Script implements Serializable {
 		}
 	}
 
+	private void dumpInputStreamToLogger(PrintStream logger, InputStream input) throws IOException {
+		byte[] buf = new byte[512];
+		int bytesRead = input.read(buf);
+		while (bytesRead != -1) {
+			logger.write(buf, 0, bytesRead);
+			logger.flush();
+			bytesRead = input.read(buf);
+		}
+	}
+
 	/**
 	 * Attempts to delete the given file, logging an error to the given BuildListener if anything goes wrong.
+	 *
 	 * @param tempFile File to delete
 	 * @param listener Where to log to if an error occurs.
 	 */
@@ -114,9 +127,10 @@ public class Script implements Serializable {
 	/**
 	 * Copies the remote file to the local temporary directory and marks it as executable.
 	 * If anything goes wrong, the file is deleted.
+	 *
 	 * @param listener Used for logging.
 	 * @return The path to the file on the local machine.
-	 * @throws IOException Thrown if anything goes wrong with copying the file or creating the file locally.
+	 * @throws IOException          Thrown if anything goes wrong with copying the file or creating the file locally.
 	 * @throws InterruptedException Thrown if the thread is interrupted while the file is copying.
 	 */
 	private File copyFile(BuildListener listener) throws IOException, InterruptedException {
@@ -162,42 +176,6 @@ public class Script implements Serializable {
 		} catch (IOException e) {
 			deleteFile(tempFile, listener);
 			throw e;
-		}
-	}
-
-	/**
-	 * Writes the standard out stream of the given process to the logger.
-	 * @param exec The process to get the stream from.
-	 * @param logger The PrintStream to use.
-	 * @throws IOException Thrown if anything goes wrong with reading from the stream.
-	 */
-	private void dumpInputStream(Process exec, PrintStream logger) throws IOException {
-		InputStream inputStream = exec.getInputStream();
-		try {
-			byte[] bytes = StreamUtils.getBytes(inputStream);
-			logger.print(new String(bytes));
-		} finally {
-			inputStream.close();
-		}
-	}
-
-	/**
-	 * Writes the error stream of the given process to the listener using the BuildListener#error method.
-	 * @param exec The process to get the stream from.
-	 * @param listener The BuildListener to log to.
-	 * @throws IOException Thrown if anything goes wrong with reading from the stream.
-	 */
-	private void dumpErrorStream(Process exec, BuildListener listener) throws IOException {
-		InputStream errorStream = exec.getErrorStream();
-		try {
-			byte[] bytes = StreamUtils.getBytes(errorStream);
-			String errorString = new String(bytes);
-			if (!errorString.isEmpty()) {
-				listener.error("StdErr: ");
-				listener.error(errorString);
-			}
-		} finally {
-			errorStream.close();
 		}
 	}
 }
