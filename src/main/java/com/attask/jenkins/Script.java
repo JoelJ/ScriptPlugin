@@ -83,7 +83,7 @@ public class Script implements Serializable {
 			Process exec = processBuilder.start();
 
 			logger.println("Output: ");
-			StreamUtils.copy(exec.getInputStream(), logger);
+			StreamUtils.copy(exec.getInputStream(), logger, 512);
 
 			int errorCode = exec.waitFor();
 
