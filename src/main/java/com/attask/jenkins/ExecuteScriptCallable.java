@@ -35,7 +35,7 @@ public class ExecuteScriptCallable implements FilePath.FileCallable<Integer> {
 	public Integer invoke(File f, VirtualChannel channel) throws IOException, InterruptedException {
 		Script script = runnableScripts.get(scriptName);
 
-		int exitCode = script.execute(Parameter.toStringList(parameters, environment), workspacePath, listener);
+		int exitCode = script.execute(Parameter.toStringList(parameters, environment), environment, workspacePath, listener);
 		return exitCode;
 	}
 }

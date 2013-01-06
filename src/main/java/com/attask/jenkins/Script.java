@@ -2,13 +2,13 @@ package com.attask.jenkins;
 
 import hudson.FilePath;
 import hudson.model.BuildListener;
-import hudson.model.Run;
 import hudson.remoting.VirtualChannel;
 import org.apache.log4j.lf5.util.StreamUtils;
 
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents a file hosted on another machine to be executed on the current node.
@@ -54,23 +54,19 @@ public class Script implements Serializable {
 	 * @throws IOException Thrown if there's an exception raised when attempting to execute the script.
 	 * @throws InterruptedException Thrown when the file is being copied <em>or</em> when the script is being executed if an interruption is caused (such as a build being canceled).
 	 */
-	public int execute(List<String> parameters, String workspacePath, BuildListener listener) throws IOException, InterruptedException {
+	public int execute(List<String> parameters, Map<String, String> environment, String workspacePath, BuildListener listener) throws IOException, InterruptedException {
 		File localFile = copyFile(listener);
 		try {
 			List<String> cmdBuilder = new ArrayList<String>(parameters.size() + 1);
 			cmdBuilder.add(localFile.getAbsolutePath());
 			cmdBuilder.addAll(parameters);
-			String[] cmd = cmdBuilder.toArray(new String[cmdBuilder.size()]);
+
 			File workspaceDirectory = new File(workspacePath);
-			Process exec = Runtime.getRuntime().exec(cmd, new String[]{}, workspaceDirectory);
-			int errorCode = exec.waitFor();
 
-			String filePrettyName = file.getAbsolutePath().substring(remoteRootPath.getRemote().length() + 1);
-			if (errorCode != 0) {
-				listener.error(filePrettyName + " exited with status " + errorCode);
-			}
-
-			PrintStream logger = listener.getLogger();
+			ProcessBuilder processBuilder = new ProcessBuilder(cmdBuilder);
+			processBuilder.directory(workspaceDirectory);
+			processBuilder.environment().putAll(environment);
+			processBuilder.redirectErrorStream(true);
 
 			//Flatten the args, so it's easy to debug the script by just copying and pasting exactly what is being run
 			StringBuilder flatArgsBuilder = new StringBuilder();
@@ -78,10 +74,25 @@ public class Script implements Serializable {
 				flatArgsBuilder.append('"').append(parameter).append('"').append(' ');
 			}
 			String flatArgs = flatArgsBuilder.toString().trim().replace("\"", "\\\"");
+			String filePrettyName = file.getAbsolutePath().substring(remoteRootPath.getRemote().length() + 1);
 
+			PrintStream logger = listener.getLogger();
 			logger.println("Executing `" + filePrettyName + " " + flatArgs + "`");
-			dumpInputStream(exec, logger);
-			dumpErrorStream(exec, listener);
+			long startTime = System.currentTimeMillis();
+
+			Process exec = processBuilder.start();
+
+			logger.println("Output: ");
+			StreamUtils.copy(exec.getInputStream(), logger);
+
+			int errorCode = exec.waitFor();
+
+			if (errorCode != 0) {
+				listener.error(filePrettyName + " exited with status " + errorCode);
+			}
+
+			long runTime = System.currentTimeMillis() - startTime;
+			logger.println("Runtime: " + (runTime / 1000) + " seconds");
 
 			return errorCode;
 		} finally {
