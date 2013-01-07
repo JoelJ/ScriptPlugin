@@ -109,7 +109,7 @@ public class ScriptBuilder extends Builder {
 		final String scriptName = getScriptName();
 		if(runnableScripts.containsKey(scriptName)) {
 			EnvVars environment = build.getEnvironment(listener);
-			String workspacePath = build.getExecutor().getCurrentWorkspace().getRemote();
+			String workspacePath = build.getWorkspace().getRemote();
 
 			ExecuteScriptCallable fileScriptCallable = new ExecuteScriptCallable(runnableScripts, scriptName, getParameters(), environment, workspacePath, listener);
 			final int exitCode = build.getBuiltOn().getRootPath().act(fileScriptCallable);
