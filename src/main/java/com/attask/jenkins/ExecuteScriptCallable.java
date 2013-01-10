@@ -16,16 +16,14 @@ import java.util.Map;
  * Time: 7:37 PM
  */
 public class ExecuteScriptCallable implements FilePath.FileCallable<Integer> {
-	private final Map<String, Script> runnableScripts;
-	private final String scriptName;
+	private final Script script;
 	private final List<Parameter> parameters;
 	private final EnvVars environment;
 	private final String workspacePath;
 	private final BuildListener listener;
 
-	public ExecuteScriptCallable(Map<String, Script> runnableScripts, String scriptName, List<Parameter> parameters, EnvVars environment, String workspacePath, BuildListener listener) {
-		this.runnableScripts = runnableScripts;
-		this.scriptName = scriptName;
+	public ExecuteScriptCallable(Script script, List<Parameter> parameters, EnvVars environment, String workspacePath, BuildListener listener) {
+		this.script = script;
 		this.parameters = parameters;
 		this.environment = environment;
 		this.workspacePath = workspacePath;
@@ -33,8 +31,6 @@ public class ExecuteScriptCallable implements FilePath.FileCallable<Integer> {
 	}
 
 	public Integer invoke(File f, VirtualChannel channel) throws IOException, InterruptedException {
-		Script script = runnableScripts.get(scriptName);
-
 		int exitCode = script.execute(Parameter.toStringList(parameters, environment), environment, workspacePath, listener);
 		return exitCode;
 	}

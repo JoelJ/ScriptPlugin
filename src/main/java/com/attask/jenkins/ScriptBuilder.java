@@ -33,9 +33,10 @@ public class ScriptBuilder extends Builder {
 	private final ErrorMode unstableMode;
 	private final String unstableRange;
 	private final String injectProperties;
+	private final boolean runOnMaster;
 
 	@DataBoundConstructor
-	public ScriptBuilder(String scriptName, List<Parameter> parameters, boolean abortOnFailure, ErrorMode errorMode, String errorRange, ErrorMode unstableMode, String unstableRange, String injectProperties) {
+	public ScriptBuilder(String scriptName, List<Parameter> parameters, boolean abortOnFailure, ErrorMode errorMode, String errorRange, ErrorMode unstableMode, String unstableRange, String injectProperties, boolean runOnMaster) {
 		this.scriptName = scriptName;
 		if(parameters == null) {
 			this.parameters = Collections.emptyList();
@@ -50,12 +51,16 @@ public class ScriptBuilder extends Builder {
 		this.unstableRange = unstableRange;
 
 		this.injectProperties = injectProperties;
+
+		this.runOnMaster = runOnMaster;
 	}
 
+	@Exported
 	public String getScriptName() {
 		return scriptName;
 	}
 
+	@Exported
 	public List<Parameter> getParameters() {
 		return parameters;
 	}
@@ -90,6 +95,14 @@ public class ScriptBuilder extends Builder {
 		return injectProperties;
 	}
 
+	/**
+	 * If true the script runs on the master node in a temporary directory rather than on the machine the build is running on.
+	 */
+	@Exported
+	public boolean getRunOnMaster() {
+		return runOnMaster;
+	}
+
 	@Override
 	public DescriptorImpl getDescriptor() {
 		return (DescriptorImpl) super.getDescriptor();
@@ -105,32 +118,49 @@ public class ScriptBuilder extends Builder {
 
 	@Override
 	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener) throws InterruptedException, IOException {
+		boolean result;
+
 		final Map<String, Script> runnableScripts = findRunnableScripts();
-		final String scriptName = getScriptName();
-		if(runnableScripts.containsKey(scriptName)) {
-			EnvVars environment = build.getEnvironment(listener);
-			String workspacePath = build.getWorkspace().getRemote();
-
-			ExecuteScriptCallable fileScriptCallable = new ExecuteScriptCallable(runnableScripts, scriptName, getParameters(), environment, workspacePath, listener);
-			final int exitCode = build.getBuiltOn().getRootPath().act(fileScriptCallable);
-
-			Result result = ExitCodeParser.findResult(exitCode, errorMode, errorRange, unstableMode, unstableRange);
-			build.setResult(result);
-			if(result.isWorseThan(Result.SUCCESS)) {
-				listener.error("Exit code " + exitCode + " evaluated to " + result);
+		Script script = runnableScripts.get(scriptName);
+		if(script != null) {
+			if(this.runOnMaster) {
+				FilePath workspace = Jenkins.getInstance().getRootPath().createTempDir("Workspace", "Temp");
+				try {
+					result = execute(build, listener, script, workspace);
+				} finally {
+					workspace.deleteRecursive();
+				}
+			} else {
+				FilePath workspace = build.getWorkspace();
+				result = execute(build, listener, script, workspace);
 			}
-
-			if(injectProperties != null && !injectProperties.isEmpty()) {
-				InjectPropertiesCallable injectPropertiesCallable = new InjectPropertiesCallable(workspacePath, this.injectProperties);
-				Map<String, String> injectedPropertiesMap = build.getExecutor().getCurrentWorkspace().act(injectPropertiesCallable);
-				build.addAction(new InjectPropertiesAction(injectedPropertiesMap));
-			}
-
-			return !(abortOnFailure && result.isWorseOrEqualTo(Result.FAILURE));
 		} else {
 			listener.error("'" + scriptName + "' doesn't exist anymore. Failing.");
-			return false;
+			result = false;
 		}
+
+		return result;
+	}
+
+	private boolean execute(AbstractBuild<?, ?> build, BuildListener listener, Script script, FilePath workspace) throws IOException, InterruptedException {
+		EnvVars environment = build.getEnvironment(listener);
+
+		ExecuteScriptCallable fileScriptCallable = new ExecuteScriptCallable(script, getParameters(), environment, workspace.getRemote(), listener);
+		final int exitCode = workspace.act(fileScriptCallable);
+
+		Result result = ExitCodeParser.findResult(exitCode, errorMode, errorRange, unstableMode, unstableRange);
+		build.setResult(result);
+		if(result.isWorseThan(Result.SUCCESS)) {
+			listener.error("Exit code " + exitCode + " evaluated to " + result);
+		}
+
+		if(injectProperties != null && !injectProperties.isEmpty()) {
+			InjectPropertiesCallable injectPropertiesCallable = new InjectPropertiesCallable(workspace.getRemote(), this.injectProperties);
+			Map<String, String> injectedPropertiesMap = workspace.act(injectPropertiesCallable);
+			build.addAction(new InjectPropertiesAction(injectedPropertiesMap));
+		}
+
+		return !(abortOnFailure && result.isWorseOrEqualTo(Result.FAILURE));
 	}
 
 	@Extension

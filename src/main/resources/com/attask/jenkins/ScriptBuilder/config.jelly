@@ -28,6 +28,9 @@
 		<f:entry title="Unstable Value" field="unstableRange">
 			<f:textbox />
 		</f:entry>
+		<f:entry title="Run on Master" field="runOnMaster">
+			<f:checkbox/>
+		</f:entry>
 	</f:advanced>
 
 	<!--Used in the pre/post build steps.-->
