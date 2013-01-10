@@ -3,6 +3,7 @@ package com.attask.jenkins;
 import hudson.FilePath;
 import hudson.model.BuildListener;
 import hudson.remoting.VirtualChannel;
+import org.apache.commons.io.FileUtils;
 import org.apache.log4j.lf5.util.StreamUtils;
 
 import java.io.*;
@@ -44,6 +45,10 @@ public class Script implements Serializable {
 	 */
 	public File getFile() {
 		return file;
+	}
+
+	public String findScriptContents() throws IOException {
+		return FileUtils.readFileToString(getFile());
 	}
 
 	/**

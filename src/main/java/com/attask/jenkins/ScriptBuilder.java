@@ -199,6 +199,10 @@ public class ScriptBuilder extends Builder {
 			return items;
 		}
 
+		public String getGuid() {
+			return UUID.randomUUID().toString().replaceAll("-", "");
+		}
+
 		private Map<String, Script> findRunnableScripts(FilePath userContent) {
 			final List<String> fileTypes = Arrays.asList(this.getFileTypes().split("\\s+"));
 			try {

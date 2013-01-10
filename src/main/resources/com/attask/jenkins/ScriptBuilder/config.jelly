@@ -1,7 +1,70 @@
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout"
 		 xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+	<script src="${rootURL}/plugin/ScriptPlugin/scripts/prettify.js"><!--empty--></script>
+	<link href="${rootURL}/plugin/ScriptPlugin/styles/prettify.css" type="text/css" rel="stylesheet" />
+
+	<!--<script>-->
+		<!--Event.observe(window, "load", function() {-->
+			<!--prettyPrint();-->
+		<!--});-->
+	<!--</script>-->
+
 	<f:entry title="Script Name" field="scriptName">
-		<f:select />
+		<div class="scriptName">
+			<j:set var="guid" value="${descriptor.getGuid()}"/>
+
+			<f:select id="select-${guid}" onchange="selectChanged('${guid}')" />
+			<input type="button" value="Show Content" onclick="loadPreview('${guid}')" />
+			<pre id="code-${guid}" class="prettyprint" style="border: 1px solid black; padding: 4px; display: none;"></pre>
+			<script><![CDATA[
+				function hideContent(guid) {
+					var codeTag = ${"$"}('code-' + guid);
+					codeTag.style.display = "none";
+				}
+
+				function showContent(guid) {
+					var selectBox = ${"$"}('select-' + guid);
+
+					var url = '${rootURL}';
+					if(!url.endsWith('/')) {
+						url = url + '/';
+					}
+
+					new Ajax.Request(url+'scriptApi/file', {
+						method: 'get',
+						parameters: { 'path': selectBox.value },
+						evalJS: 'false',
+						onSuccess: function(transport) {
+							var codeTag = ${"$"}('code-' + guid);
+							codeTag.innerText = transport.responseText;
+							codeTag.style.display = "block";
+							prettyPrint();
+						},
+						onError: function(transport) {
+							console.log("failure!", transport);
+						}
+					});
+				}
+
+				function selectChanged(guid) {
+					var codeTag = ${"$"}('code-' + guid);
+					if(codeTag.style.display == "block") {
+						showContent(guid);
+					}
+				}
+
+				function loadPreview(guid) {
+					var codeTag = ${"$"}('code-' + guid);
+					if(codeTag.style.display == "block") {
+						hideContent(guid);
+					} else {
+						showContent(guid);
+					}
+
+					return false;
+				}
+			]]></script>
+		</div>
 	</f:entry>
 	<f:entry title="Parameters">
 		<f:repeatableProperty field="parameters"/>
