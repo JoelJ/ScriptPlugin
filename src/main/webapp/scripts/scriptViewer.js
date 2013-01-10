@@ -55,13 +55,17 @@ function saveChanges(guid) {
 
 	var selectBox = $('select-' + guid);
 	var codeEditor = $('codeEditor-' + guid);
+	var codeBox = codeEditor.down("pre");
+	codeBox.style.backgroundColor = "#D5D5D5";
+	codeBox.removeAttribute("contenteditable");
 
 	new Ajax.Request(url+'scriptApi/updateFile', {
 		method: 'post',
 		parameters: { 'path': selectBox.value, 'content': codeEditor.innerText },
 		evalJS: 'false',
 		onSuccess: function(transport) {
-			//Nothing to do here, move along
+			codeBox.style.backgroundColor = "white";
+			codeBox.setAttribute("contenteditable", true);
 		},
 		onError: function(transport) {
 			alert("failed to save!", transport);
