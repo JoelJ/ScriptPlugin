@@ -66,10 +66,15 @@ function saveChanges(guid) {
 		onSuccess: function(transport) {
 			codeBox.style.backgroundColor = "white";
 			codeBox.setAttribute("contenteditable", true);
+			prettyPrint();
 		},
 		onError: function(transport) {
 			alert("failed to save!", transport);
 			console.log("failed to save!");
+
+			codeBox.style.backgroundColor = "white";
+			codeBox.setAttribute("contenteditable", true);
+			prettyPrint();
 		}
 	});
 }
