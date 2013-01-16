@@ -53,7 +53,7 @@ public class ScriptPreBuild extends BuildWrapper {
 		};
 	}
 
-	@Extension
+	@Extension(ordinal = 100)
 	public static class DescriptorImpl extends BuildWrapperDescriptor {
 		@Override
 		public String getDisplayName() {
