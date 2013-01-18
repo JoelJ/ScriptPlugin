@@ -31,14 +31,6 @@ public class Parameter extends AbstractDescribableImpl<Parameter> implements Ser
 		return parameter;
 	}
 
-	public static List<String> toStringList(Collection<Parameter> parameters, EnvVars environment) {
-		List<String> result = new ArrayList<String>(parameters.size());
-		for (Parameter parameter : parameters) {
-			result.add(environment.expand(parameter.getParameter()));
-		}
-		return result;
-	}
-
 	@Override
 	public String toString() {
 		return parameter;
@@ -55,6 +47,24 @@ public class Parameter extends AbstractDescribableImpl<Parameter> implements Ser
 	@Override
 	public int hashCode() {
 		return parameter != null ? parameter.hashCode() : 0;
+	}
+
+	public String getParameterKey() {
+		int i = parameter.indexOf("=");
+		if(i >= 0) {
+			return parameter.substring(0, i);
+		} else {
+			return parameter;
+		}
+	}
+
+	public String getParameterValue() {
+		int i = parameter.indexOf("=");
+		if(i >= 0) {
+			return parameter.substring(i+1);
+		} else {
+			return "";
+		}
 	}
 
 	@Extension

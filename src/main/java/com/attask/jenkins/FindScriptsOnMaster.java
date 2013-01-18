@@ -15,18 +15,19 @@ import java.util.*;
  * Time: 5:47 PM
  */
 public class FindScriptsOnMaster implements FilePath.FileCallable<Map<String, Script>> {
+	private final FilePath userContent;
 	private final List<String> fileTypes;
 
-	public FindScriptsOnMaster(List<String> fileTypes) {
+	public FindScriptsOnMaster(FilePath userContent, List<String> fileTypes) {
+		this.userContent = userContent;
 		this.fileTypes = fileTypes;
 	}
 
 	public Map<String, Script> invoke(File f, VirtualChannel channel) throws IOException, InterruptedException {
-		FilePath rootPath = Jenkins.getInstance().getRootPath();
 		Map<String, Script> result = new HashMap<String, Script>();
 		List<File> files = findFiles(f, this.fileTypes);
 		for (File file : files) {
-			result.put(file.getAbsolutePath(), new Script(rootPath, file));
+			result.put(file.getAbsolutePath(), new Script(new FilePath(userContent, file.getPath())));
 		}
 		return Collections.unmodifiableMap(result);
 	}

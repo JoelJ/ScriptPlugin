@@ -5,8 +5,10 @@ import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
 import hudson.model.*;
+import hudson.tasks.BatchFile;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
+import hudson.tasks.Shell;
 import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
@@ -123,16 +125,20 @@ public class ScriptBuilder extends Builder {
 		final Map<String, Script> runnableScripts = findRunnableScripts();
 		Script script = runnableScripts.get(scriptName);
 		if(script != null) {
-			if(this.runOnMaster) {
+			Map<String, String> varsToInject = injectParameters(parameters);
+			build.addAction(new InjectPropertiesAction(varsToInject));
+
+			//If we want to run it on master, do so. But if the job is already running on master, just run it as if the run on master flag isn't set.
+			if(this.runOnMaster && !(launcher instanceof Launcher.LocalLauncher)) {
 				FilePath workspace = Jenkins.getInstance().getRootPath().createTempDir("Workspace", "Temp");
 				try {
-					result = execute(build, listener, script, workspace);
+					Launcher masterLauncher = new Launcher.RemoteLauncher(listener, workspace.getChannel(), true);
+					result = execute(build, masterLauncher, listener, script);
 				} finally {
 					workspace.deleteRecursive();
 				}
 			} else {
-				FilePath workspace = build.getWorkspace();
-				result = execute(build, listener, script, workspace);
+				result = execute(build, launcher, listener, script);
 			}
 		} else {
 			listener.error("'" + scriptName + "' doesn't exist anymore. Failing.");
@@ -142,25 +148,25 @@ public class ScriptBuilder extends Builder {
 		return result;
 	}
 
-	private boolean execute(AbstractBuild<?, ?> build, BuildListener listener, Script script, FilePath workspace) throws IOException, InterruptedException {
-		EnvVars environment = build.getEnvironment(listener);
-
-		ExecuteScriptCallable fileScriptCallable = new ExecuteScriptCallable(script, getParameters(), environment, workspace.getRemote(), listener);
-		final int exitCode = workspace.act(fileScriptCallable);
-
-		Result result = ExitCodeParser.findResult(exitCode, errorMode, errorRange, unstableMode, unstableRange);
-		build.setResult(result);
-		if(result.isWorseThan(Result.SUCCESS)) {
-			listener.error("Exit code " + exitCode + " evaluated to " + result);
+	private Map<String, String> injectParameters(List<Parameter> parameters) {
+		Map<String, String> result = new HashMap<String, String>();
+		for (Parameter parameter : parameters) {
+			String key = parameter.getParameterKey();
+			String value = parameter.getParameterValue();
+			result.put(key, value);
 		}
+		return result;
+	}
 
-		if(injectProperties != null && !injectProperties.isEmpty()) {
-			InjectPropertiesCallable injectPropertiesCallable = new InjectPropertiesCallable(workspace.getRemote(), this.injectProperties);
-			Map<String, String> injectedPropertiesMap = workspace.act(injectPropertiesCallable);
-			build.addAction(new InjectPropertiesAction(injectedPropertiesMap));
+	private boolean execute(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener, Script script) throws IOException, InterruptedException {
+		String scriptContents = script.findScriptContents();
+		if(launcher.isUnix()) {
+			Shell shell = new Shell(scriptContents);
+			return shell.perform(build, launcher, listener);
+		} else {
+			BatchFile batchFile = new BatchFile(scriptContents);
+			return batchFile.perform(build, launcher, listener);
 		}
-
-		return !(abortOnFailure && result.isWorseOrEqualTo(Result.FAILURE));
 	}
 
 	@Extension
@@ -190,10 +196,10 @@ public class ScriptBuilder extends Builder {
 			ListBoxModel items = new ListBoxModel();
 			for (Script script : findRunnableScripts(userContent).values()) {
 				//Pretty up the name
-				String path = script.getFile().getAbsolutePath();
+				String path = script.getFile().getRemote();
 				path = path.substring(userContent.getRemote().length()+1);
 
-				items.add(path, script.getFile().getAbsolutePath());
+				items.add(path, script.getFile().getRemote());
 			}
 
 			return items;
@@ -206,7 +212,7 @@ public class ScriptBuilder extends Builder {
 		private Map<String, Script> findRunnableScripts(FilePath userContent) {
 			final List<String> fileTypes = Arrays.asList(this.getFileTypes().split("\\s+"));
 			try {
-				return userContent.act(new FindScriptsOnMaster(fileTypes));
+				return userContent.act(new FindScriptsOnMaster(userContent, fileTypes));
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			} catch (InterruptedException e) {
