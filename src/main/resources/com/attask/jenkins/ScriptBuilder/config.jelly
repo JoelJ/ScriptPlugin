@@ -1,12 +1,13 @@
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout"
 		 xmlns:t="/lib/hudson" xmlns:f="/lib/form">
-	<script>
-		ROOT_URL = "${rootURL}";
-	</script>
-	<script src="${rootURL}/plugin/ScriptPlugin/scripts/prettify.js"><!--empty--></script>
-	<script src="${rootURL}/plugin/ScriptPlugin/scripts/scriptViewer.js"><!--empty--></script>
-	<link href="${rootURL}/plugin/ScriptPlugin/styles/prettify.css" type="text/css" rel="stylesheet" />
-
+	<f:entry>
+		<script>
+			ROOT_URL = "${rootURL}";
+		</script>
+		<script src="${rootURL}/plugin/ScriptPlugin/scripts/prettify.js"><!--empty--></script>
+		<script src="${rootURL}/plugin/ScriptPlugin/scripts/scriptViewer.js"><!--empty--></script>
+		<link href="${rootURL}/plugin/ScriptPlugin/styles/prettify.css" type="text/css" rel="stylesheet" />
+	</f:entry>
 	<!--<script>-->
 		<!--Event.observe(window, "load", function() {-->
 			<!--prettyPrint();-->
