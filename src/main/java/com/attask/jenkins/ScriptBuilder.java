@@ -24,6 +24,9 @@ import java.util.*;
  */
 @ExportedBean
 public class ScriptBuilder extends Builder {
+	public static final boolean CONTINUE = true;
+	public static final boolean ABORT = false;
+
 	private final String scriptName; //will be an absolute path
 	private final List<Parameter> parameters;
 	private final boolean abortOnFailure;
@@ -65,9 +68,6 @@ public class ScriptBuilder extends Builder {
 		final Map<String, Script> runnableScripts = findRunnableScripts();
 		Script script = runnableScripts.get(scriptName);
 		if (script != null) {
-			Map<String, String> varsToInject = injectParameters(parameters);
-			build.addAction(new InjectPropertiesAction(varsToInject));
-
 			//If we want to run it on master, do so. But if the job is already running on master, just run it as if the run on master flag isn't set.
 			if (this.runOnMaster && !(launcher instanceof Launcher.LocalLauncher)) {
 				FilePath workspace = Jenkins.getInstance().getRootPath().createTempDir("Workspace", "Temp");
@@ -85,21 +85,29 @@ public class ScriptBuilder extends Builder {
 			result = Result.FAILURE;
 		}
 
+		injectProperties(build, listener);
+
 		build.setResult(result);
 
-		//noinspection SimplifiableIfStatement
-		if (abortOnFailure) {
-			return result.isBetterOrEqualTo(Result.SUCCESS);
+		boolean failed = result.isWorseOrEqualTo(Result.FAILURE);
+		if(failed) {
+			if(abortOnFailure) {
+				listener.getLogger().println("Abort on Failure is enabled: Aborting.");
+				return ABORT;
+			} else {
+				listener.getLogger().println("Abort on Failure is disabled: Continuing.");
+				return CONTINUE;
+			}
 		} else {
-			return true;
+			return CONTINUE;
 		}
 	}
 
-	private Map<String, String> injectParameters(List<Parameter> parameters) {
+	private Map<String, String> injectParameters(List<Parameter> parameters, EnvVars envVars) {
 		Map<String, String> result = new HashMap<String, String>();
 		for (Parameter parameter : parameters) {
 			String key = parameter.getParameterKey();
-			String value = parameter.getParameterValue();
+			String value = envVars.expand(parameter.getParameterValue());
 			result.put(key, value);
 		}
 		return result;
@@ -128,7 +136,6 @@ public class ScriptBuilder extends Builder {
 		logger.println("----------------------------------------");
 		logger.println(script.getFile().getName() + " finished in " + runTime + "ms.");
 		logger.println("Exit code was " + exitCode + ". " + result + ".");
-		logger.println("========================================");
 
 		return result;
 	}
@@ -167,7 +174,8 @@ public class ScriptBuilder extends Builder {
 			try {
 				EnvVars envVars = build.getEnvironment(listener);
 
-				injectProperties(build, envVars, listener);
+				Map<String, String> varsToInject = injectParameters(parameters, envVars);
+				envVars.putAll(varsToInject);
 
 				// on Windows environment variables are converted to all upper case,
 				// but no such conversions are done on Unix, so to make this cross-platform,
@@ -195,7 +203,7 @@ public class ScriptBuilder extends Builder {
 		}
 	}
 
-	private void injectProperties(AbstractBuild<?, ?> build, EnvVars envVars, BuildListener listener) throws IOException {
+	private void injectProperties(AbstractBuild<?, ?> build, BuildListener listener) throws IOException {
 		PrintStream logger = listener.getLogger();
 
 		if (getInjectProperties() != null && !getInjectProperties().isEmpty()) {
@@ -210,13 +218,15 @@ public class ScriptBuilder extends Builder {
 				read.close();
 			}
 
+			Map<String, String> result = new HashMap<String, String>(injectedProperties.size());
 			for (Map.Entry<Object, Object> entry : injectedProperties.entrySet()) {
 				logger.println("\t" + entry.getKey() + " => " + entry.getValue());
-				envVars.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
+				result.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
 			}
-		} else {
-			logger.println("No parameters to inject.");
+			build.addAction(new InjectPropertiesAction(result));
 		}
+		logger.println("========================================");
+		logger.println();
 	}
 
 	@Exported
