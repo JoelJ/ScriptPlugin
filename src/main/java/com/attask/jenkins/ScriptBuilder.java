@@ -116,6 +116,7 @@ public class ScriptBuilder extends Builder {
 		}
 
 		PrintStream logger = listener.getLogger();
+		logger.println("========================================");
 		logger.println("Executing: " + script.getFile().getName());
 		logger.println("----------------------------------------");
 
@@ -127,7 +128,7 @@ public class ScriptBuilder extends Builder {
 		logger.println("----------------------------------------");
 		logger.println(script.getFile().getName() + " finished in " + runTime + "ms.");
 		logger.println("Exit code was " + exitCode + ". " + result + ".");
-		logger.println("----------------------------------------");
+		logger.println("========================================");
 
 		return result;
 	}
@@ -313,6 +314,11 @@ public class ScriptBuilder extends Builder {
 			}
 
 			return items;
+		}
+
+		@Exported
+		public String getGuid() {
+			return UUID.randomUUID().toString().replaceAll("-", "");
 		}
 
 		private Map<String, Script> findRunnableScripts(FilePath userContent) {
