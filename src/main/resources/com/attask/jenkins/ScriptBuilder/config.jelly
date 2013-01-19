@@ -36,17 +36,17 @@
 		</f:entry>
 
 		<f:entry title="Abort On Failure" field="abortOnFailure">
-			<f:checkbox />
+			<f:checkbox default="true" />
 		</f:entry>
 		<f:entry title="Fail On" field="errorMode">
-			<f:select />
+			<f:select default="NON_ZERO" />
 		</f:entry>
 		<f:entry title="Fail Value" field="errorRange">
 			<f:textbox />
 		</f:entry>
 
 		<f:entry title="Unstable On" field="unstableMode">
-			<f:select />
+			<f:select/>
 		</f:entry>
 		<f:entry title="Unstable Value" field="unstableRange">
 			<f:textbox />
