@@ -18,6 +18,8 @@ import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.export.ExportedBean;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
 import java.util.*;
 
 /**
@@ -145,7 +147,30 @@ public class ScriptBuilder extends Builder {
 			result = false;
 		}
 
+		injectProperties(build, listener);
+
 		return result;
+	}
+
+	private void injectProperties(AbstractBuild<?, ?> build, BuildListener listener) throws IOException {
+		if(getInjectProperties() != null && !getInjectProperties().isEmpty()) {
+			PrintStream logger = listener.getLogger();
+			logger.println("injecting properties from " + getInjectProperties());
+			FilePath filePath = new FilePath(build.getWorkspace(), getInjectProperties());
+			Properties injectedProperties = new Properties();
+			InputStream read = filePath.read();
+			try {
+				injectedProperties.load(read);
+			} finally {
+				read.close();
+			}
+			Map<String, String> injectedMap = new HashMap<String, String>(injectedProperties.size());
+			for (Map.Entry<Object, Object> entry : injectedProperties.entrySet()) {
+				logger.println("\t" + entry.getKey() + " => " + entry.getValue());
+				injectedMap.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
+			}
+			build.addAction(new InjectPropertiesAction(injectedMap));
+		}
 	}
 
 	private Map<String, String> injectParameters(List<Parameter> parameters) {
