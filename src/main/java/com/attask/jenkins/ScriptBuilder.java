@@ -1,19 +1,14 @@
 package com.attask.jenkins;
 
-import hudson.EnvVars;
-import hudson.Extension;
-import hudson.FilePath;
-import hudson.Launcher;
+import hudson.*;
 import hudson.model.*;
-import hudson.tasks.BatchFile;
-import hudson.tasks.BuildStepDescriptor;
-import hudson.tasks.Builder;
-import hudson.tasks.Shell;
+import hudson.tasks.*;
+import hudson.tasks.Messages;
 import hudson.util.ListBoxModel;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
-import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.StaplerRequest;
+import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.export.Exported;
 import org.kohsuke.stapler.export.ExportedBean;
 
@@ -42,7 +37,7 @@ public class ScriptBuilder extends Builder {
 	@DataBoundConstructor
 	public ScriptBuilder(String scriptName, List<Parameter> parameters, boolean abortOnFailure, ErrorMode errorMode, String errorRange, ErrorMode unstableMode, String unstableRange, String injectProperties, boolean runOnMaster) {
 		this.scriptName = scriptName;
-		if(parameters == null) {
+		if (parameters == null) {
 			this.parameters = Collections.emptyList();
 		} else {
 			this.parameters = Collections.unmodifiableList(new ArrayList<Parameter>(parameters));
@@ -57,6 +52,170 @@ public class ScriptBuilder extends Builder {
 		this.injectProperties = injectProperties;
 
 		this.runOnMaster = runOnMaster;
+	}
+
+	@Override
+	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener) throws InterruptedException, IOException {
+		return runScript(build, launcher, listener);
+	}
+
+	private boolean runScript(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener) throws IOException, InterruptedException {
+		Result result;
+
+		final Map<String, Script> runnableScripts = findRunnableScripts();
+		Script script = runnableScripts.get(scriptName);
+		if (script != null) {
+			Map<String, String> varsToInject = injectParameters(parameters);
+			build.addAction(new InjectPropertiesAction(varsToInject));
+
+			//If we want to run it on master, do so. But if the job is already running on master, just run it as if the run on master flag isn't set.
+			if (this.runOnMaster && !(launcher instanceof Launcher.LocalLauncher)) {
+				FilePath workspace = Jenkins.getInstance().getRootPath().createTempDir("Workspace", "Temp");
+				try {
+					Launcher masterLauncher = new Launcher.RemoteLauncher(listener, workspace.getChannel(), true);
+					result = execute(build, masterLauncher, listener, script);
+				} finally {
+					workspace.deleteRecursive();
+				}
+			} else {
+				result = execute(build, launcher, listener, script);
+			}
+		} else {
+			listener.error("'" + scriptName + "' doesn't exist anymore. Failing.");
+			result = Result.FAILURE;
+		}
+
+		build.setResult(result);
+
+		//noinspection SimplifiableIfStatement
+		if (abortOnFailure) {
+			return result.isBetterOrEqualTo(Result.SUCCESS);
+		} else {
+			return true;
+		}
+	}
+
+	private Map<String, String> injectParameters(List<Parameter> parameters) {
+		Map<String, String> result = new HashMap<String, String>();
+		for (Parameter parameter : parameters) {
+			String key = parameter.getParameterKey();
+			String value = parameter.getParameterValue();
+			result.put(key, value);
+		}
+		return result;
+	}
+
+	private Result execute(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener, Script script) throws IOException, InterruptedException {
+		String scriptContents = script.findScriptContents();
+		int exitCode;
+		CommandInterpreter commandInterpreter;
+		if (launcher.isUnix()) {
+			commandInterpreter = new Shell(scriptContents);
+		} else {
+			commandInterpreter = new BatchFile(scriptContents);
+		}
+
+		PrintStream logger = listener.getLogger();
+		logger.println("Executing: " + script.getFile().getName());
+		logger.println("----------------------------------------");
+
+		long startTime = System.currentTimeMillis();
+		exitCode = executeScript(build, launcher, listener, commandInterpreter);
+		long runTime = System.currentTimeMillis() - startTime;
+		Result result = ExitCodeParser.findResult(exitCode, errorMode, errorRange, unstableMode, unstableRange);
+
+		logger.println("----------------------------------------");
+		logger.println(script.getFile().getName() + " finished in " + runTime + "ms.");
+		logger.println("Exit code was " + exitCode + ". " + result + ".");
+		logger.println("----------------------------------------");
+
+		return result;
+	}
+
+	/**
+	 * <p>
+	 *	This method is simply an inline of
+	 *		{@link CommandInterpreter#perform(hudson.model.AbstractBuild, hudson.Launcher, hudson.model.TaskListener)},
+	 *	but returning the exit code instead of a boolean.
+	 *	Also, I've cleaned up the code a bit.
+	 *	Tried to remove any inspection warnings, renamed variables so they would be useful, and added curly braces.
+	 * </p>
+	 * <p>
+	 *  If that method ever gets updated, this one should be too.
+	 *  Obviously the better solution is to change the CommandInterpreter to have two public methods,
+	 *  one that returns the integer value.
+	 * </p>
+	 * <p>
+	 *  The reason I do this is because the exit code provides useful user customization.
+	 *  So now the user can define if the script fails or goes unstable or even remains successful for certain exit codes.
+	 * </p>
+	 */
+	private int executeScript(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener, CommandInterpreter command) throws InterruptedException, IOException {
+		FilePath ws = build.getWorkspace();
+		FilePath script = null;
+		try {
+			try {
+				script = command.createScriptFile(ws);
+			} catch (IOException e) {
+				Util.displayIOException(e, listener);
+				e.printStackTrace(listener.fatalError(Messages.CommandInterpreter_UnableToProduceScript()));
+				return -2;
+			}
+
+			int exitCode;
+			try {
+				EnvVars envVars = build.getEnvironment(listener);
+
+				injectProperties(build, envVars, listener);
+
+				// on Windows environment variables are converted to all upper case,
+				// but no such conversions are done on Unix, so to make this cross-platform,
+				// convert variables to all upper cases.
+				for (Map.Entry<String, String> e : build.getBuildVariables().entrySet()) {
+					envVars.put(e.getKey(), e.getValue());
+				}
+
+				exitCode = launcher.launch().cmds(command.buildCommandLine(script)).envs(envVars).stdout(listener).pwd(ws).join();
+			} catch (IOException e) {
+				Util.displayIOException(e, listener);
+				e.printStackTrace(listener.fatalError(Messages.CommandInterpreter_CommandFailed()));
+				throw e;
+			}
+			return exitCode;
+		} finally {
+			try {
+				if (script != null) {
+					script.delete();
+				}
+			} catch (IOException e) {
+				Util.displayIOException(e, listener);
+				e.printStackTrace(listener.fatalError(Messages.CommandInterpreter_UnableToDelete(script)));
+			}
+		}
+	}
+
+	private void injectProperties(AbstractBuild<?, ?> build, EnvVars envVars, BuildListener listener) throws IOException {
+		PrintStream logger = listener.getLogger();
+
+		if (getInjectProperties() != null && !getInjectProperties().isEmpty()) {
+			logger.println("injecting properties from " + getInjectProperties());
+
+			FilePath filePath = new FilePath(build.getWorkspace(), getInjectProperties());
+			Properties injectedProperties = new Properties();
+			InputStream read = filePath.read();
+			try {
+				injectedProperties.load(read);
+			} finally {
+				read.close();
+			}
+
+			for (Map.Entry<Object, Object> entry : injectedProperties.entrySet()) {
+				logger.println("\t" + entry.getKey() + " => " + entry.getValue());
+				envVars.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
+			}
+		} else {
+			logger.println("No parameters to inject.");
+		}
 	}
 
 	@Exported
@@ -120,80 +279,6 @@ public class ScriptBuilder extends Builder {
 		return descriptor.findRunnableScripts(userContent);
 	}
 
-	@Override
-	public boolean perform(AbstractBuild<?, ?> build, Launcher launcher, final BuildListener listener) throws InterruptedException, IOException {
-		boolean result;
-
-		final Map<String, Script> runnableScripts = findRunnableScripts();
-		Script script = runnableScripts.get(scriptName);
-		if(script != null) {
-			Map<String, String> varsToInject = injectParameters(parameters);
-			build.addAction(new InjectPropertiesAction(varsToInject));
-
-			//If we want to run it on master, do so. But if the job is already running on master, just run it as if the run on master flag isn't set.
-			if(this.runOnMaster && !(launcher instanceof Launcher.LocalLauncher)) {
-				FilePath workspace = Jenkins.getInstance().getRootPath().createTempDir("Workspace", "Temp");
-				try {
-					Launcher masterLauncher = new Launcher.RemoteLauncher(listener, workspace.getChannel(), true);
-					result = execute(build, masterLauncher, listener, script);
-				} finally {
-					workspace.deleteRecursive();
-				}
-			} else {
-				result = execute(build, launcher, listener, script);
-			}
-		} else {
-			listener.error("'" + scriptName + "' doesn't exist anymore. Failing.");
-			result = false;
-		}
-
-		injectProperties(build, listener);
-
-		return result;
-	}
-
-	private void injectProperties(AbstractBuild<?, ?> build, BuildListener listener) throws IOException {
-		if(getInjectProperties() != null && !getInjectProperties().isEmpty()) {
-			PrintStream logger = listener.getLogger();
-			logger.println("injecting properties from " + getInjectProperties());
-			FilePath filePath = new FilePath(build.getWorkspace(), getInjectProperties());
-			Properties injectedProperties = new Properties();
-			InputStream read = filePath.read();
-			try {
-				injectedProperties.load(read);
-			} finally {
-				read.close();
-			}
-			Map<String, String> injectedMap = new HashMap<String, String>(injectedProperties.size());
-			for (Map.Entry<Object, Object> entry : injectedProperties.entrySet()) {
-				logger.println("\t" + entry.getKey() + " => " + entry.getValue());
-				injectedMap.put(String.valueOf(entry.getKey()), String.valueOf(entry.getValue()));
-			}
-			build.addAction(new InjectPropertiesAction(injectedMap));
-		}
-	}
-
-	private Map<String, String> injectParameters(List<Parameter> parameters) {
-		Map<String, String> result = new HashMap<String, String>();
-		for (Parameter parameter : parameters) {
-			String key = parameter.getParameterKey();
-			String value = parameter.getParameterValue();
-			result.put(key, value);
-		}
-		return result;
-	}
-
-	private boolean execute(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener, Script script) throws IOException, InterruptedException {
-		String scriptContents = script.findScriptContents();
-		if(launcher.isUnix()) {
-			Shell shell = new Shell(scriptContents);
-			return shell.perform(build, launcher, listener);
-		} else {
-			BatchFile batchFile = new BatchFile(scriptContents);
-			return batchFile.perform(build, launcher, listener);
-		}
-	}
-
 	@Extension
 	public static final class DescriptorImpl extends BuildStepDescriptor<Builder> {
 		public String fileTypes;
@@ -207,7 +292,7 @@ public class ScriptBuilder extends Builder {
 
 		public String getFileTypes() {
 			load();
-			if(fileTypes == null || fileTypes.isEmpty()) {
+			if (fileTypes == null || fileTypes.isEmpty()) {
 				return ".*";
 			}
 			return fileTypes;
@@ -222,16 +307,12 @@ public class ScriptBuilder extends Builder {
 			for (Script script : findRunnableScripts(userContent).values()) {
 				//Pretty up the name
 				String path = script.getFile().getRemote();
-				path = path.substring(userContent.getRemote().length()+1);
+				path = path.substring(userContent.getRemote().length() + 1);
 
 				items.add(path, script.getFile().getRemote());
 			}
 
 			return items;
-		}
-
-		public String getGuid() {
-			return UUID.randomUUID().toString().replaceAll("-", "");
 		}
 
 		private Map<String, Script> findRunnableScripts(FilePath userContent) {
