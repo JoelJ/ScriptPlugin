@@ -176,6 +176,7 @@ public class ScriptBuilder extends Builder {
 
 				Map<String, String> varsToInject = injectParameters(parameters, envVars);
 				envVars.putAll(varsToInject);
+				envVars.put("BUILD_RESULT", build.getResult().toString());
 
 				// on Windows environment variables are converted to all upper case,
 				// but no such conversions are done on Unix, so to make this cross-platform,
