@@ -38,6 +38,9 @@ public class FindScriptsOnMaster implements FilePath.FileCallable<Map<String, Sc
 
 		File[] files = directory.listFiles(new FileFilter() {
 			public boolean accept(File file) {
+				if(file.getName().startsWith(".")) {
+					return false;
+				}
 				if (file.isDirectory()) {
 					return true;
 				}
@@ -60,6 +63,7 @@ public class FindScriptsOnMaster implements FilePath.FileCallable<Map<String, Sc
 				result.add(file.getAbsoluteFile());
 			}
 		}
+		Collections.sort(result);
 		return result;
 	}
 }
