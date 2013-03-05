@@ -63,7 +63,11 @@ public class FindScriptsOnMaster implements FilePath.FileCallable<Map<String, Sc
 				result.add(file.getAbsoluteFile());
 			}
 		}
-		Collections.sort(result);
+		Collections.sort(result, new Comparator<File>() {
+			public int compare(File file1, File file2) {
+				return file1.getPath().compareTo(file2.getPath());
+			}
+		});
 		return result;
 	}
 }
