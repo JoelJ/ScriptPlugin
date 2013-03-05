@@ -70,15 +70,19 @@ public class ScriptBuilder extends Builder {
 		if (script != null) {
 			//If we want to run it on master, do so. But if the job is already running on master, just run it as if the run on master flag isn't set.
 			if (this.runOnMaster && !(launcher instanceof Launcher.LocalLauncher)) {
+				listener.getLogger().println("Executing on master");
 				FilePath workspace = Jenkins.getInstance().getRootPath().createTempDir("Workspace", "Temp");
+				listener.getLogger().println("Creating temporary workspace " + workspace.getRemote());
 				try {
-					Launcher masterLauncher = new Launcher.RemoteLauncher(listener, workspace.getChannel(), true);
-					result = execute(build, masterLauncher, listener, script);
+					Launcher masterLauncher = new Launcher.RemoteLauncher(listener, Jenkins.getInstance().getChannel(), true);
+					result = execute(workspace, build, masterLauncher, listener, script);
 				} finally {
+					listener.getLogger().println("Deleting temporary workspace " + workspace.getRemote());
 					workspace.deleteRecursive();
 				}
 			} else {
-				result = execute(build, launcher, listener, script);
+				listener.getLogger().println("Executing on remote machine");
+				result = execute(build.getWorkspace(), build, launcher, listener, script);
 			}
 		} else {
 			listener.error("'" + scriptName + "' doesn't exist anymore. Failing.");
@@ -113,7 +117,7 @@ public class ScriptBuilder extends Builder {
 		return result;
 	}
 
-	private Result execute(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener, Script script) throws IOException, InterruptedException {
+	private Result execute(FilePath workspace, AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener, Script script) throws IOException, InterruptedException {
 		String scriptContents = script.findScriptContents();
 		int exitCode;
 		CommandInterpreter commandInterpreter;
@@ -129,7 +133,7 @@ public class ScriptBuilder extends Builder {
 		logger.println("----------------------------------------");
 
 		long startTime = System.currentTimeMillis();
-		exitCode = executeScript(build, launcher, listener, commandInterpreter);
+		exitCode = executeScript(workspace, build, launcher, listener, commandInterpreter);
 		long runTime = System.currentTimeMillis() - startTime;
 		Result result = ExitCodeParser.findResult(exitCode, errorMode, errorRange, unstableMode, unstableRange);
 
@@ -158,8 +162,7 @@ public class ScriptBuilder extends Builder {
 	 *  So now the user can define if the script fails or goes unstable or even remains successful for certain exit codes.
 	 * </p>
 	 */
-	private int executeScript(AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener, CommandInterpreter command) throws InterruptedException, IOException {
-		FilePath ws = build.getWorkspace();
+	private int executeScript(FilePath ws, AbstractBuild<?, ?> build, Launcher launcher, BuildListener listener, CommandInterpreter command) throws InterruptedException, IOException {
 		FilePath script = null;
 		try {
 			try {
@@ -185,7 +188,12 @@ public class ScriptBuilder extends Builder {
 					envVars.put(e.getKey(), e.getValue());
 				}
 
-				exitCode = launcher.launch().cmds(command.buildCommandLine(script)).envs(envVars).stdout(listener).pwd(ws).join();
+				Launcher.ProcStarter launch = launcher.launch();
+				Launcher.ProcStarter cmds = launch.cmds(command.buildCommandLine(script));
+				Launcher.ProcStarter envs = cmds.envs(envVars);
+				Launcher.ProcStarter stdout = envs.stdout(listener);
+				Launcher.ProcStarter pwd = stdout.pwd(ws);
+				exitCode = pwd.join();
 			} catch (IOException e) {
 				Util.displayIOException(e, listener);
 				e.printStackTrace(listener.fatalError(Messages.CommandInterpreter_CommandFailed()));
