@@ -10,7 +10,7 @@ import java.io.*;
  * Date: 8/29/12
  * Time: 5:38 PM
  */
-public class Script implements Serializable {
+public class Script implements Serializable, Comparable<Script> {
 	private final FilePath file;
 
 	/**
@@ -28,5 +28,20 @@ public class Script implements Serializable {
 
 	public FilePath getFile() {
 		return file;
+	}
+
+	public int compareTo(Script that) {
+		String thisName = "";
+		String thatName = "";
+
+		if(that != null && that.file != null && that.file.getRemote() != null) {
+			thatName = that.file.getRemote();
+		}
+
+		if(this.file != null && this.file.getRemote() != null) {
+			thisName = this.file.getRemote();
+		}
+
+		return thisName.compareTo(thatName);
 	}
 }

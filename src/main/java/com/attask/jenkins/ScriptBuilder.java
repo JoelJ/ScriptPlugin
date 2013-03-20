@@ -324,7 +324,8 @@ public class ScriptBuilder extends Builder {
 			FilePath userContent = new FilePath(rootPath, "userContent");
 
 			ListBoxModel items = new ListBoxModel();
-			for (Script script : findRunnableScripts(userContent).values()) {
+			SortedSet<Script> values = new TreeSet<Script>(findRunnableScripts(userContent).values());
+			for (Script script : values) {
 				//Pretty up the name
 				String path = script.getFile().getRemote();
 				path = path.substring(userContent.getRemote().length() + 1);
@@ -343,7 +344,11 @@ public class ScriptBuilder extends Builder {
 		private Map<String, Script> findRunnableScripts(FilePath userContent) {
 			final List<String> fileTypes = Arrays.asList(this.getFileTypes().split("\\s+"));
 			try {
-				return userContent.act(new FindScriptsOnMaster(userContent, fileTypes));
+				Map<String, Script> result = userContent.act(new FindScriptsOnMaster(userContent, fileTypes));
+				if(result == null) {
+					result = Collections.emptyMap();
+				}
+				return result;
 			} catch (IOException e) {
 				throw new RuntimeException(e);
 			} catch (InterruptedException e) {
