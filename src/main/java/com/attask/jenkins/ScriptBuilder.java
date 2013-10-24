@@ -80,9 +80,14 @@ public class ScriptBuilder extends Builder {
 					listener.getLogger().println("Deleting temporary workspace " + workspace.getRemote());
 					workspace.deleteRecursive();
 				}
-			} else {
+			} else if(build.getWorkspace() != null) {
 				listener.getLogger().println("Executing on remote machine");
 				result = execute(build.getWorkspace(), build, launcher, listener, script);
+			} else {
+				// http://javadoc.jenkins-ci.org/hudson/model/AbstractBuild.html#getWorkspace()
+				// Nullpointer is being thrown.
+				listener.getLogger().println("Slave is no longer connected.");
+				result = Result.FAILURE;
 			}
 		} else {
 			listener.error("'" + scriptName + "' doesn't exist anymore. Failing.");
